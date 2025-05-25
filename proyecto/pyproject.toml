@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "proyecto-ir"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+authors = ["Paul Lora", "Byron Carpio", "Diego Suquillo"]
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+fastapi = "^0.115.7"
+uvicorn = { extras = ["standard"], version = "^0.34.0" }
+pydantic = {extras = ["email"], version = "^2.10.6"}
+poethepoet = "^0.25.0"
+
+
+[tool.poe.tasks.api]
+env = { "ENV" = "local" }
+cmd = "uvicorn src.main:app --reload"
+
+
+[tool.pylint.master]
+max-line-length = 200
+disable = [
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "too-few-public-methods",
+    "wrong-import-order",
+    "attribute-defined-outside-init",
+    "too-many-arguments",
+    "too-many-positional-arguments"
+]
+ignore-paths = "tests"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
