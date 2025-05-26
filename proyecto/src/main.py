@@ -1,6 +1,8 @@
-
 from src import __version__
 from src.api import API
+from src.actuator import router as actuator
+from src.ir import router as ir
+
 
 app = API(
     openapi_url="/openapi.json",
@@ -18,6 +20,4 @@ app = API(
 
 
 app.include_router(actuator.router)
-app.add_router(teams.router)
-
-customize_openapi(app)
+app.add_router(ir.router)
