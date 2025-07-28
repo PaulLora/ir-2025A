@@ -3,3 +3,7 @@ proyecto/.idea/
 notebooks/.env
 
 notebooks/index_13langchain*
+
+.DS_Store
+
+*.DS_Store
