@@ -4,6 +4,8 @@ notebooks/.env
 
 notebooks/index_13langchain*
 
+notebooks/examen-final.ipynb
+
 .DS_Store
 
 *.DS_Store
