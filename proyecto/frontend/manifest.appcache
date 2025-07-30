@@ -1,0 +1,22 @@
+# Manifiesto de caché para optimización de carga
+# Versión 1.0
+
+CACHE MANIFEST
+
+# Archivos a cachear
+CACHE:
+index.html
+css/vuetify.min.css
+css/materialdesignicons.min.css
+css/app.css
+js/vue.esm-browser.prod.js
+js/vuetify.esm.js
+js/axios.min.js
+fonts/materialdesignicons-webfont.woff2
+
+# Archivos que siempre deben obtenerse de la red
+NETWORK:
+*
+
+# Archivos de respaldo
+FALLBACK:

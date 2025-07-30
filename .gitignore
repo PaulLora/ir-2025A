@@ -7,3 +7,6 @@ notebooks/index_13langchain*
 .DS_Store
 
 *.DS_Store
+
+# local history
+.history/

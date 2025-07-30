@@ -1,0 +1,120 @@
+/* Estilos personalizados para optimización de carga */
+@font-face {
+  font-family: "Material Design Icons";
+  src: url("../fonts/materialdesignicons-webfont.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.mdi::before {
+  font-family: "Material Design Icons";
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Optimizaciones de carga */
+.v-application {
+  font-family: 'Roboto', sans-serif;
+}
+
+/* Precarga de elementos críticos */
+.v-app-bar {
+  will-change: transform;
+}
+
+.v-navigation-drawer {
+  will-change: transform;
+}
+
+/* Mejoras de rendimiento */
+.v-img {
+  will-change: transform;
+}
+
+/* Loading spinner personalizado */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Imagen de fondo */
+body {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%),
+              url('../assets/fondo.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+}
+
+/* Overlay para mejor legibilidad del contenido */
+.v-application {
+  background: transparent !important;
+}
+
+/* Estilos glassmorphism para componentes */
+.v-main {
+  background: transparent !important;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card .v-card-title,
+.glass-card .v-card-text,
+.glass-card .v-list-item-title {
+  color: rgba(0, 0, 0, 0.87) !important;
+}
+
+.app-bar-glass {
+  background: transparent !important;
+  backdrop-filter: none;
+  border-bottom: none;
+}
+
+.glass-textarea .v-field {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.glass-textarea .v-field__input {
+  color: white !important;
+  font-size: 16px;
+}
+
+.glass-textarea .v-field__input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.hidden {
+  display: none !important;
+}

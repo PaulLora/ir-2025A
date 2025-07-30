@@ -2,6 +2,7 @@ from src import __version__
 from src.api import API
 from src.actuator import router as actuator
 from src.ir import router as ir
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = API(
@@ -16,6 +17,14 @@ app = API(
     },
     docs_url=None,
     redoc_url="/docs",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción, especifica los dominios permitidos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
