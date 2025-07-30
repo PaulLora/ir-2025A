@@ -15,7 +15,7 @@
 
 /* Optimizaciones de carga */
 .v-application {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
 }
 
 /* Precarga de elementos críticos */
@@ -56,14 +56,22 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Imagen de fondo */
 body {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%),
-              url('../assets/fondo.jpg');
+  background: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.8) 0%,
+      rgba(30, 41, 59, 0.8) 100%
+    ),
+    url("../assets/fondo.jpg");
   background-size: cover;
   background-position: center center;
   background-attachment: fixed;
@@ -117,4 +125,57 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+.custom-snackbar .v-snackbar__wrapper {
+  min-width: 200px !important;
+  max-width: 300px !important;
+}
+
+.results-section {
+  height: calc(100vh - 218px);
+  overflow-y: auto;
+  padding-right: 12px;
+  padding-left: 12px;
+}
+
+/* Scrollbar con efecto glass */
+.results-section::-webkit-scrollbar {
+  width: 5px;
+}
+
+.results-section::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.results-section::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.results-section::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.25) 100%
+  );
+  transform: scaleY(1.1);
+}
+
+.prompt {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.25) !important;
+  margin-left: auto;
+  width: fit-content;
+  text-align: right;
+  padding: 8px 12px;
 }

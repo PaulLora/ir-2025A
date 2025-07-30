@@ -35,23 +35,87 @@
         <v-main>
           <v-container
             fluid
-            class="d-flex align-center justify-center"
+            class="d-flex"
+            :class="results.length > 0 ? 'align-end' : 'align-center'"
             style="min-height: calc(100vh - 64px)"
           >
-            <v-row justify="center" align="center">
-              <v-col cols="12" sm="8" md="6" lg="5" xl="4">
-                <div class="text-center text-white mb-12">
+            <v-row justify="center">
+              <v-col class="pa-0" cols="12" sm="8" md="6" lg="5" xl="4">
+                <div
+                  v-if="results.length > 0"
+                  class="results-section text-white"
+                >
+                  <template v-for="(result, r) in results" :key="result.id">
+                    <div class="prompt">
+                      <v-img
+                        v-if="result.type === 'image'"
+                        :src="result.prompt"
+                        width="125"
+                        height="auto"
+                      >
+                        <template v-slot:placeholder>
+                          <div
+                            class="d-flex align-center justify-center fill-height"
+                          >
+                            <v-progress-circular
+                              color="primary"
+                              indeterminate
+                            ></v-progress-circular>
+                          </div>
+                        </template>
+                      </v-img>
+                      <span v-else> {{ result.prompt }} </span>
+                    </div>
+                    <p>{{ result.generative_response }}</p>
+                    <v-divider class="my-2"></v-divider>
+                    <p>Relacionados:</p>
+                    <template v-if="result.similar_images.length > 0">
+                      <template
+                        v-for="(image, i) in result.similar_images"
+                        :key="image.id"
+                      >
+                        <div class="d-flex flex-no-wrap justify-space-between">
+                          <v-avatar class="mx-3" rounded="0" size="125">
+                            <v-img :src="image.path">
+                              <template v-slot:placeholder>
+                                <div
+                                  class="d-flex align-center justify-center fill-height"
+                                >
+                                  <v-progress-circular
+                                    color="primary"
+                                    indeterminate
+                                  ></v-progress-circular>
+                                </div>
+                              </template>
+                            </v-img>
+                          </v-avatar>
+                          <div>
+                            <p>{{ image.description }}</p>
+                          </div>
+                        </div>
+                        <v-divider
+                          v-if="i < result.similar_images.length - 1"
+                          inset
+                          class="my-2"
+                        ></v-divider>
+                      </template>
+                    </template>
+                    <p v-else>No existen resultados relacionados</p>
+                  </template>
+                </div>
+                <div v-else class="text-center text-white mb-12">
                   <span class="text-h3">¿En qué puedo ayudar?</span>
                 </div>
                 <v-card
                   class="glass-card rounded-xl"
+                  :class="results.length > 0 ? 'mb-4' : ''"
                   outlined
                   :loading="loading"
                 >
                   <template v-slot:loader="{ isActive }">
                     <v-progress-linear
                       :active="isActive"
-                      color="white"
+                      color="teal-darken-1"
                       indeterminate
                     ></v-progress-linear>
                   </template>
@@ -98,7 +162,7 @@
                     <v-spacer></v-spacer>
                     <v-btn
                       class="text-white text-none"
-                      color="blue-darken-4"
+                      color="teal-darken-1"
                       variant="flat"
                       size="small"
                       :loading="loading"
@@ -113,9 +177,11 @@
             </v-row>
           </v-container>
           <v-snackbar
-            :timeout="5000"
-            :color="notification.type"
             v-model="snackbar"
+            :timeout="1000"
+            :color="notification.type"
+            location="bottom end"
+            class="custom-snackbar"
           >
             <template v-slot:actions>
               <v-btn icon variant="text" @click="snackbar = false">
@@ -132,66 +198,27 @@
     </div>
 
     <script type="module">
-      import { createApp, ref } from "vue";
+      import { createApp, ref, nextTick } from "vue";
       import { createVuetify } from "vuetify";
       import axios from "axios";
 
       createApp({
         setup() {
           // Data
-          const searchText = ref("");
-          const drawer = ref(false);
-          const currentView = ref("home");
-          const loading = ref(false);
-          const error = ref(null);
-          const apiData = ref(null);
-          const menuItems = ref([
-            { title: "Inicio", icon: "mdi-home", view: "home" },
-            { title: "Imágenes", icon: "mdi-image", view: "images" },
-            { title: "Archivos", icon: "mdi-folder", view: "files" },
-            { title: "API", icon: "mdi-api", view: "api" },
-          ]);
-          const images = ref([
-            {
-              id: 1,
-              url: "https://picsum.photos/300/200?random=1",
-              title: "Imagen 1",
-            },
-            {
-              id: 2,
-              url: "https://picsum.photos/300/200?random=2",
-              title: "Imagen 2",
-            },
-          ]);
-          const files = ref([
-            { id: 1, name: "documento.pdf", size: "2.3 MB" },
-            { id: 2, name: "imagen.jpg", size: "1.5 MB" },
-          ]);
-          const fileInput = ref(null);
           const webClient = axios.create({
-            baseURL: "//localhost:8000/v1", // Cambia esto a tu URL de API
+            baseURL: "//localhost:8000/v1",
           });
+          const searchText = ref("");
+          const loading = ref(false);
+          const results = ref([]);
+          const fileInput = ref(null);
           const snackbar = ref(false);
           const notification = ref("");
 
           // Methods
-          const fetchData = async () => {
-            loading.value = true;
-            error.value = null;
-            try {
-              // Ejemplo de API - reemplaza con tu URL
-              const response = await axios.get(
-                "https://jsonplaceholder.typicode.com/posts/1"
-              );
-              apiData.value = response.data;
-            } catch (err) {
-              error.value = "Error al conectar con la API: " + err.message;
-            } finally {
-              loading.value = false;
-            }
-          };
           const openFileInput = () => {
             if (fileInput.value) {
+              searchText.value = "";
               fileInput.value.value = "";
               fileInput.value.click();
             }
@@ -202,14 +229,39 @@
             loading.value = true;
             const formData = new FormData();
             formData.append("image", image);
+            const imageUrl = URL.createObjectURL(image);
             webClient
               .post("/search-by-image", formData)
               .then((response) => {
                 snackbar.value = true;
                 notification.value = {
-                  message: "Archivo subido exitosamente",
-                  type: "success",
+                  message: "Archivo subido",
+                  type: "teal-darken-1",
                 };
+                results.value.push({
+                  type: "image",
+                  prompt: imageUrl,
+                  similar_images: [
+                    {
+                      path: "https://picsum.photos/300/200?random=1",
+                      description:
+                        "Mamografía con tejido denso y microcalcificaciones en cuadrante superior externo.",
+                    },
+                    {
+                      path: "https://picsum.photos/300/200?random=2",
+                      description:
+                        "Imagen que muestra patrón similar de densidad y orientación anatómica.",
+                    },
+                    {
+                      path: "https://picsum.photos/300/200?random=3",
+                      description:
+                        "Imagen que muestra características similares a mamografías con tejido denso.",
+                    },
+                  ],
+                  generative_response:
+                    "La imagen de entrada muestra características que se asemejan a mamografías con tejido denso y posibles microcalcificaciones, observadas en regiones específicas como el cuadrante superior externo. Esto podría sugerir la necesidad de un seguimiento con estudios adicionales para descartar lesiones sospechosas.",
+                });
+                scrollToLatest();
               })
               .catch((error) => {
                 snackbar.value = true;
@@ -230,9 +282,34 @@
               .then((response) => {
                 snackbar.value = true;
                 notification.value = {
-                  message: "Texto procesado exitosamente",
-                  type: "success",
+                  message: "Texto procesado",
+                  type: "teal-darken-1",
                 };
+                results.value.push({
+                  type: "text",
+                  prompt: searchText.value,
+                  similar_images: [
+                    {
+                      path: "https://picsum.photos/300/200?random=1",
+                      description:
+                        "Mamografía con tejido denso y microcalcificaciones en cuadrante superior externo.",
+                    },
+                    {
+                      path: "https://picsum.photos/300/200?random=2",
+                      description:
+                        "Imagen que muestra patrón similar de densidad y orientación anatómica.",
+                    },
+                    {
+                      path: "https://picsum.photos/300/200?random=3",
+                      description:
+                        "Imagen que muestra características similares a mamografías con tejido denso.",
+                    },
+                  ],
+                  generative_response:
+                    "El texto ingresado sugiere la presencia de tejido mamario denso y microcalcificaciones, lo cual es común en mamografías. Estas características pueden ser indicativas de cambios benignos o, en algunos casos, de condiciones que requieren seguimiento.",
+                });
+                searchText.value = "";
+                scrollToLatest();
               })
               .catch((error) => {
                 snackbar.value = true;
@@ -246,17 +323,30 @@
                 loading.value = false;
               });
           };
+          const scrollToLatest = () => {
+            nextTick(() => {
+              const resultsSection = document.querySelector(".results-section");
+              if (resultsSection && results.value.length > 0) {
+                // Esperar un poco más para que el contenido se renderice completamente
+                setTimeout(() => {
+                  // Hacer scroll al último prompt con offset
+                  const allPrompts = resultsSection.querySelectorAll(".prompt");
+                  const lastPrompt = allPrompts[allPrompts.length - 1];
+
+                  if (lastPrompt) {
+                    const offsetTop = lastPrompt.offsetTop - 100; // 20px offset desde arriba
+                    resultsSection.scrollTo({
+                      top: offsetTop,
+                      behavior: "smooth",
+                    });
+                  }
+                }, 100); // Delay de 100ms para asegurar renderizado
+              }
+            });
+          };
 
           return {
-            drawer,
-            currentView,
-            menuItems,
-            images,
-            files,
             loading,
-            error,
-            apiData,
-            fetchData,
             openFileInput,
             fileInput,
             fileChanged,
@@ -264,6 +354,7 @@
             notification,
             searchText,
             searchByText,
+            results,
           };
         },
       })
