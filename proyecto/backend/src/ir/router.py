@@ -29,8 +29,6 @@ images_dir = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "I
 # Load FAISS index
 features_dir = Path(__file__).parent.parent.parent.parent / "data" / "features"
 index_path = features_dir / "image_index.faiss"
-if not index_path.exists():
-    raise HTTPException(status_code=404, detail="Índice de imágenes no encontrado")
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
