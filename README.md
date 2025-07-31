@@ -240,7 +240,7 @@ k = 5  # Número de resultados similares
 # - IndexFlatL2: Exacto, lento para grandes datasets
 ```
 
-### Variables de Entorno Opcionales
+### Variables de Entorno
 ```bash
 # backend/.env
 OPENAI_API_KEY=sk-...                    # API key de OpenAI (requerido)
@@ -341,6 +341,7 @@ Este proyecto está bajo la **Licencia MIT**. Ver [LICENSE](LICENSE) para más d
 - **Facebook Research** - Por la biblioteca FAISS
 - **FastAPI Team** - Por el excelente framework web
 - **Vue.js Team** - Por el framework frontend reactivo
+- **Vuetify Team** - Por los componentes Material Design
 
 ## 📚 Referencias Técnicas
 
