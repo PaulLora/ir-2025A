@@ -76,7 +76,9 @@
                       >
                         <div class="d-flex flex-no-wrap justify-space-between">
                           <v-avatar class="mx-3" rounded="0" size="125">
-                            <v-img :src="image.path">
+                            <v-img
+                              :src="'data:image/jpeg;base64,' + image.imageb64"
+                            >
                               <template v-slot:placeholder>
                                 <div
                                   class="d-flex align-center justify-center fill-height"
@@ -229,37 +231,21 @@
             loading.value = true;
             const formData = new FormData();
             formData.append("image", image);
+            formData.append("search_type", "image");
             const imageUrl = URL.createObjectURL(image);
             webClient
-              .post("/search-by-image", formData)
+              .post("/seeker", formData)
               .then((response) => {
                 snackbar.value = true;
                 notification.value = {
-                  message: "Archivo subido",
+                  message: "Imagen procesada",
                   type: "teal-darken-1",
                 };
                 results.value.push({
                   type: "image",
                   prompt: imageUrl,
-                  similar_images: [
-                    {
-                      path: "https://picsum.photos/300/200?random=1",
-                      description:
-                        "Mamografía con tejido denso y microcalcificaciones en cuadrante superior externo.",
-                    },
-                    {
-                      path: "https://picsum.photos/300/200?random=2",
-                      description:
-                        "Imagen que muestra patrón similar de densidad y orientación anatómica.",
-                    },
-                    {
-                      path: "https://picsum.photos/300/200?random=3",
-                      description:
-                        "Imagen que muestra características similares a mamografías con tejido denso.",
-                    },
-                  ],
-                  generative_response:
-                    "La imagen de entrada muestra características que se asemejan a mamografías con tejido denso y posibles microcalcificaciones, observadas en regiones específicas como el cuadrante superior externo. Esto podría sugerir la necesidad de un seguimiento con estudios adicionales para descartar lesiones sospechosas.",
+                  generative_response: response.data.generative_response,
+                  similar_images: response.data.similar_images,
                 });
                 scrollToLatest();
               })
@@ -277,8 +263,11 @@
           };
           const searchByText = () => {
             loading.value = true;
+            const formData = new FormData();
+            formData.append("text", searchText.value);
+            formData.append("search_type", "text");
             webClient
-              .post("/search-by-text", { text: searchText.value })
+              .post("/seeker", formData)
               .then((response) => {
                 snackbar.value = true;
                 notification.value = {
@@ -288,25 +277,8 @@
                 results.value.push({
                   type: "text",
                   prompt: searchText.value,
-                  similar_images: [
-                    {
-                      path: "https://picsum.photos/300/200?random=1",
-                      description:
-                        "Mamografía con tejido denso y microcalcificaciones en cuadrante superior externo.",
-                    },
-                    {
-                      path: "https://picsum.photos/300/200?random=2",
-                      description:
-                        "Imagen que muestra patrón similar de densidad y orientación anatómica.",
-                    },
-                    {
-                      path: "https://picsum.photos/300/200?random=3",
-                      description:
-                        "Imagen que muestra características similares a mamografías con tejido denso.",
-                    },
-                  ],
-                  generative_response:
-                    "El texto ingresado sugiere la presencia de tejido mamario denso y microcalcificaciones, lo cual es común en mamografías. Estas características pueden ser indicativas de cambios benignos o, en algunos casos, de condiciones que requieren seguimiento.",
+                  generative_response: response.data.generative_response,
+                  similar_images: response.data.similar_images,
                 });
                 searchText.value = "";
                 scrollToLatest();

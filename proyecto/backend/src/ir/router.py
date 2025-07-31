@@ -1,12 +1,21 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from multiprocessing import context
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from src.api import route_version
 from pathlib import Path
-import uuid
 from PIL import Image
 from io import BytesIO
 import torch
 import clip
 from pydantic import BaseModel
+import pandas as pd
+import os
+import numpy as np
+import faiss
+from dotenv import load_dotenv
+from openai import OpenAI
+import base64
+from enum import Enum
+from typing import Optional
 
 router = APIRouter()
 
@@ -14,95 +23,135 @@ router = APIRouter()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
-# Modelo para request body de texto
-class TextSearchRequest(BaseModel):
-    text: str
+# Path para las imágenes del corpus
+images_dir = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "Images"
+
+# Load FAISS index
+features_dir = Path(__file__).parent.parent.parent.parent / "data" / "features"
+index_path = features_dir / "image_index.faiss"
+if not index_path.exists():
+    raise HTTPException(status_code=404, detail="Índice de imágenes no encontrado")
+
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Enums para tipos de búsqueda
+class SearchType(str, Enum):
+    IMAGE = "image"
+    TEXT = "text"
+
+# Modelo para request unificado
+class UnifiedSearchRequest(BaseModel):
+    text: Optional[str] = None
+    search_type: SearchType
 
 # Routes
-@router.get("/test")
+@router.get("/process-corpus")
 @route_version(major=1)
-async def test():
-    return {"status": "UP"}
+async def process_corpus():   
+    # Read captions file
+    df = await read_captions_file()    
+    
+    # Premake lists of paths and captions
+    image_paths = [os.path.join(images_dir, fname) for fname in df['image'].tolist()]
+    captions = df['caption'].tolist()
+    
+    # Coding images and captions
+    image_features = []
+    text_features = []
+    for image_path, caption in zip(image_paths, captions):
+        try:
+            # Load and preprocess image
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+            vectorImage = await process_image_with_clip(image_bytes)
+            if not vectorImage['success']:
+                print(f"Error processing image {image_path}: {vectorImage['error']}")
+                continue
+            else:
+                image_features.append(vectorImage['vector'])
+            
+            # Tokenize and encode caption
+            vectorCaption = await process_text_with_clip(caption)
+            if not vectorCaption['success']:
+                print(f"Error processing caption for {image_path}: {vectorCaption['error']}")
+                continue
+            else:
+                text_features.append(vectorCaption['vector'])
+        except Exception as e:
+            print(f"Error processing {image_path}: {str(e)}")
+            continue
+        
+    # Convert to numpy arrays
+    image_features = np.array(image_features)
+    text_features = np.array(text_features)
 
-@router.post("/search-by-image")
+    # Save features to disk
+    features_dir = Path(__file__).parent.parent.parent.parent / "data" / "features"
+    features_dir.mkdir(parents=True, exist_ok=True)
+
+    np.save(features_dir / "image_features.npy", image_features)
+    np.save(features_dir / "text_features.npy", text_features)
+    
+    # Create FAISS index for image features
+    index = faiss.IndexFlatL2(image_features.shape[1])  # L2 distance
+    index.add(image_features.astype(np.float32))  # Convert to float32 for FAISS
+    faiss.write_index(index, str(features_dir / "image_index.faiss"))
+    
+    return {"message": "Corpus processed successfully"}
+
+@router.post("/seeker")
 @route_version(major=1)
-async def search_by_image(image: UploadFile = File(...), save_image: bool = False):
-    # Configuración del directorio de uploads
-    UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "data" / "upload"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Tipos de archivo permitidos
-    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-    
-    # Validar que se subió un archivo
-    if not image.filename:
-        raise HTTPException(status_code=400, detail="No se proporcionó ningún archivo")
-    
-    # Validar extensión
-    file_ext = Path(image.filename).suffix.lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Tipo de archivo no permitido. Extensiones válidas: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
-    
-    # Validar tamaño
-    content = await image.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Archivo demasiado grande. Máximo permitido: {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
-    
-    # Generar nombre único
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = UPLOAD_DIR / unique_filename
-    
-    # Guardar archivo
+async def seeker(
+    search_type: str = Form(...),
+    text: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None)
+):
+    if search_type == SearchType.IMAGE:
+        if not image.filename:
+            raise HTTPException(status_code=400, detail="No se proporcionó ningún archivo")
+        content = await image.read()
+    elif search_type == SearchType.TEXT:
+        content = text.strip()
     try:
-        # PROCESAR CON CLIP (directamente desde memoria)
-        clip_results = await process_image_with_clip(content)
+        # Load FAISS index        
+        index = faiss.read_index(str(index_path))
         
-        response = {
-            "message": "Imagen procesada exitosamente",
-            "original_filename": image.filename,
-            "size": len(content),
-            "content_type": image.content_type,
-            "clip_processing": clip_results
+        # Process with CLIP
+        if search_type == SearchType.TEXT:
+            query = await process_text_with_clip(content)
+        elif search_type == SearchType.IMAGE:
+            query = await process_image_with_clip(content)
+
+        k = 5  # Número de resultados a retornar
+        query_vector = np.array(query['vector'], dtype=np.float32).reshape(1, -1)  # Reshape para FAISS
+        distances, indices = index.search(query_vector, k)  # Búsqueda en el índice FAISS
+        image_captions = await read_captions_file()  # Obtener resultados del DataFrame
+        captions = image_captions['caption'].tolist()
+        top_captions = [captions[i] for i in indices[0]]
+        images_base64 = await images_to_base64(image_captions.iloc[indices[0]])
+        prompt = f"Basado en las siguientes descripciones:\n" + "\n".join(top_captions) + "\n\nGenera una explicación o narrativa que integre esta información."
+
+        response = client.responses.create(
+            model="gpt-4.1",
+            input=prompt
+        )
+
+        return {
+            "similar_images": images_base64,
+            "generative_response": response.output_text,
         }
-        
-        # GUARDAR SOLO SI SE SOLICITA
-        if save_image:
-            unique_filename = f"{uuid.uuid4()}{file_ext}"
-            file_path = UPLOAD_DIR / unique_filename
-            
-            with open(file_path, "wb") as f:
-                f.write(content)
-            
-            response.update({
-                "saved": True,
-                "filename": unique_filename,
-                "path": str(file_path.relative_to(Path(__file__).parent.parent.parent.parent))
-            })
-        else:
-            response["saved"] = False
-        
-        return response
-    
+
     except Exception as e:
-        # Si hay error, eliminar el archivo si se creó
-        if file_path.exists():
-            file_path.unlink()
         raise HTTPException(status_code=500, detail=f"Error al guardar el archivo: {str(e)}")
 
-@router.post("/search-by-text")
-@route_version(major=1)
-async def search_by_text(request: TextSearchRequest):
+# Methods
+async def process_text_with_clip(text: str):
     """
     Convertir texto a vector CLIP para búsqueda semántica
     """
-    text = request.text.strip()
+    text = text.strip()
     try:
         # Tokenizar texto
         text_input = clip.tokenize([text]).to(device)
@@ -115,6 +164,7 @@ async def search_by_text(request: TextSearchRequest):
         vector = text_features.cpu().numpy().flatten().tolist()
         
         return {
+            "success": True,
             "text": text,
             "vector_size": len(vector),
             "vector": vector,
@@ -122,16 +172,18 @@ async def search_by_text(request: TextSearchRequest):
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error procesando texto: {str(e)}")
-
-# Methods
+        return {
+            "success": False,
+            "error": f"Error procesando texto: {str(e)}"
+        }
+    
 async def process_image_with_clip(image_bytes: bytes):
     """
     Procesa la imagen con CLIP directamente desde memoria
     """
     try:
         # Abrir imagen desde bytes (sin guardar)
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        image = Image.open(BytesIO(image_bytes)).convert("RGB").copy()
         
         # Preprocesar para CLIP
         image_input = preprocess(image).unsqueeze(0).to(device)
@@ -148,10 +200,9 @@ async def process_image_with_clip(image_bytes: bytes):
         return {
             "success": True,
             "vector_size": len(vector),
-            "vector": vector,  # Vector de características de la imagen
-            "model_used": "CLIP ViT-B/32",
+            "vector": vector,
             "device": device,
-            "image_processed": True
+            "model_used": "CLIP ViT-B/32",
         }
         
     except Exception as e:
@@ -159,3 +210,52 @@ async def process_image_with_clip(image_bytes: bytes):
             "success": False,
             "error": f"Error procesando imagen con CLIP: {str(e)}"
         }
+        
+async def read_captions_file():
+    """
+    Leer el archivo de captions y devolver un DataFrame
+    """    
+    unprocessed_captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "unprocessed_captions.txt"
+    captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "captions.txt"
+    
+    if captions_file.exists():
+        df = pd.read_pickle(captions_file)
+        return df
+    
+    with open(unprocessed_captions_file, 'r') as f:
+        lines = f.readlines()
+
+    # Process lines and create a DataFrame
+    data = []    
+    for line in lines[1:]:
+        line = line.strip()
+        if not line or ',' not in line:
+            continue
+        image, caption = line.split(',', 1)
+        image = image.strip()
+        caption = caption.strip()
+        data.append({"image": image, "caption": caption})
+
+    df = pd.DataFrame(data)
+    
+    # Save the DataFrame to a pickle file for future use
+    df.to_pickle(captions_file)
+    return df
+
+async def images_to_base64(related_df):
+    """ 
+    Convertir imágenes a base64 desde un DataFrame
+    """
+    resultados = []
+    for _, row in related_df.iterrows():
+        image_path = images_dir / row['image']
+        try:
+            with open(image_path, "rb") as img_file:
+                base64_str = base64.b64encode(img_file.read()).decode('utf-8')
+            resultados.append({
+                "description": row.get("caption", ""),
+                "imageb64": base64_str
+            })
+        except Exception as e:
+            print(f"No se pudo procesar la imagen {image_path}: {e}")
+    return resultados
