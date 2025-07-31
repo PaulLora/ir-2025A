@@ -63,7 +63,7 @@ async def process_corpus():
             # Load and preprocess image
             with open(image_path, "rb") as f:
                 image_bytes = f.read()
-            vectorImage = await process_image_with_clip(image_bytes)
+            vectorImage = await process_with_clip(image_bytes=image_bytes, type=SearchType.IMAGE)
             if not vectorImage['success']:
                 print(f"Error processing image {image_path}: {vectorImage['error']}")
                 continue
@@ -71,7 +71,7 @@ async def process_corpus():
                 image_features.append(vectorImage['vector'])
             
             # Tokenize and encode caption
-            vectorCaption = await process_text_with_clip(caption)
+            vectorCaption = await process_with_clip(text=caption, type=SearchType.TEXT)
             if not vectorCaption['success']:
                 print(f"Error processing caption for {image_path}: {vectorCaption['error']}")
                 continue
@@ -118,9 +118,9 @@ async def seeker(
         
         # Process with CLIP
         if search_type == SearchType.TEXT:
-            query = await process_text_with_clip(content)
+            query = await process_with_clip(text=content, type=SearchType.TEXT)
         elif search_type == SearchType.IMAGE:
-            query = await process_image_with_clip(content)
+            query = await process_with_clip(image_bytes=content, type=SearchType.IMAGE)
 
         k = 5  # Número de resultados a retornar
         query_vector = np.array(query['vector'], dtype=np.float32).reshape(1, -1)  # Reshape para FAISS
@@ -145,68 +145,38 @@ async def seeker(
         raise HTTPException(status_code=500, detail=f"Error al guardar el archivo: {str(e)}")
 
 # Methods
-async def process_text_with_clip(text: str):
-    """
-    Convertir texto a vector CLIP para búsqueda semántica
-    """
-    text = text.strip()
-    try:
-        # Tokenizar texto
-        text_input = clip.tokenize([text]).to(device)
-        
-        # Generar embeddings de texto
-        with torch.no_grad():
-            text_features = model.encode_text(text_input)
-            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-        
-        vector = text_features.cpu().numpy().flatten().tolist()
-        
-        return {
-            "success": True,
-            "text": text,
-            "vector_size": len(vector),
-            "vector": vector,
-            "model_used": "CLIP ViT-B/32"
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Error procesando texto: {str(e)}"
-        }
-    
-async def process_image_with_clip(image_bytes: bytes):
+async def process_with_clip(image_bytes: Optional[bytes] = None, text: Optional[str] = None, type: SearchType = SearchType.IMAGE):
     """
     Procesa la imagen con CLIP directamente desde memoria
     """
     try:
-        # Abrir imagen desde bytes (sin guardar)
-        image = Image.open(BytesIO(image_bytes)).convert("RGB").copy()
-        
-        # Preprocesar para CLIP
-        image_input = preprocess(image).unsqueeze(0).to(device)
-        
+        if type == SearchType.IMAGE:
+            image = Image.open(BytesIO(image_bytes)).convert("RGB").copy()
+            content = preprocess(image).unsqueeze(0).to(device)
+        elif type == SearchType.TEXT:
+            content = clip.tokenize([text.strip()]).to(device)
+
         # Generar embeddings con CLIP
         with torch.no_grad():
-            image_features = model.encode_image(image_input)
+            if type == SearchType.TEXT:
+                features = model.encode_text(content)
+            else:
+                features = model.encode_image(content)
             # Normalizar para similitud coseno
-            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
-        
+            features = features / features.norm(dim=-1, keepdim=True)
+
         # Convertir a numpy para serialización
-        vector = image_features.cpu().numpy().flatten().tolist()
+        vector = features.cpu().numpy().flatten().tolist()
         
         return {
             "success": True,
-            "vector_size": len(vector),
             "vector": vector,
-            "device": device,
-            "model_used": "CLIP ViT-B/32",
         }
         
     except Exception as e:
         return {
             "success": False,
-            "error": f"Error procesando imagen con CLIP: {str(e)}"
+            "error": f"Error procesando con CLIP: {str(e)}"
         }
         
 async def read_captions_file():
