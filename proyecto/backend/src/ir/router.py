@@ -183,9 +183,9 @@ async def read_captions_file():
     """
     Leer el archivo de captions y devolver un DataFrame
     """    
-    unprocessed_captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "unprocessed_captions.txt"
-    captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "captions.txt"
-    
+    unprocessed_captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "captions.txt"
+    captions_file = Path(__file__).parent.parent.parent.parent / "data" / "corpus" / "captions_processed.txt"
+
     if captions_file.exists():
         df = pd.read_pickle(captions_file)
         return df
